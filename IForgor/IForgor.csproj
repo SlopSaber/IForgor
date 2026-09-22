@@ -2,6 +2,8 @@
 
     <PropertyGroup>
         <TargetFramework>net472</TargetFramework>
+    <EnableFrameworkPathOverride>true</EnableFrameworkPathOverride>
+    <FrameworkPathOverride>$(BeatSaberDir)\Beat Saber_Data\Managed</FrameworkPathOverride>
         <OutputType>Library</OutputType>
         <LangVersion>9</LangVersion>
         <Nullable>disable</Nullable>
@@ -13,6 +15,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+    <Reference Include="netstandard" HintPath="$(BeatSaberDir)\Beat Saber_Data\Managed\netstandard.dll" Private="false" />
         <Reference Include="UnityEngine.CoreModule">
             <HintPath>$(BeatSaberDir)\Beat Saber_Data\Managed\UnityEngine.CoreModule.dll</HintPath>
             <Private>False</Private>
