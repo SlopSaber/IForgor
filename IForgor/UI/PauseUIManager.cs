@@ -17,6 +17,7 @@ namespace IForgor.UI
 		private readonly DiContainer _container;
 
 		private Transform _pauseCanvasTransform;
+		private PauseMenuManager _pendingPauseMenu;
 		private ColorManager _colorManager;
 		private PauseController _pauseController;
 
@@ -24,6 +25,7 @@ namespace IForgor.UI
 		private bool _groupBNullified = true;
 		private bool _uiCreated;
 		private bool _disposed;
+		private bool _waitingForAssets;
 		private PauseSnapshot _pendingPause;
 
 		private sealed class PauseSnapshot
@@ -62,6 +64,12 @@ namespace IForgor.UI
 		}
 		
 		public void Initialize() {
+			if (!_assetLoader.IsComplete)
+			{
+				_pendingPauseMenu = Resources.FindObjectsOfTypeAll<PauseMenuManager>().FirstOrDefault();
+				_pauseCanvasTransform = _pendingPauseMenu.transform.Find("Wrapper").Find("MenuWrapper").Find("Canvas").transform;
+				_waitingForAssets = true;
+			}
 			_pauseController.didPauseEvent += OnPause;
 			if (_assetLoader.IsComplete) OnAssetsCompleted();
 			else _assetLoader.Completed += OnAssetsCompleted;
@@ -78,6 +86,18 @@ namespace IForgor.UI
 		{
 			_assetLoader.Completed -= OnAssetsCompleted;
 			if (_disposed || !_pauseController) return;
+			if (_waitingForAssets)
+			{
+				Transform wrapper = _pendingPauseMenu ? _pendingPauseMenu.transform.Find("Wrapper") : null;
+				Transform menuWrapper = wrapper ? wrapper.Find("MenuWrapper") : null;
+				Transform canvas = menuWrapper ? menuWrapper.Find("Canvas") : null;
+				if (!_pauseCanvasTransform || canvas != _pauseCanvasTransform)
+				{
+					_pauseController.didPauseEvent -= OnPause;
+					_pendingPause = null;
+					return;
+				}
+			}
 			if (_assetLoader.LoadError != null)
 			{
 				_pauseController.didPauseEvent -= OnPause;
