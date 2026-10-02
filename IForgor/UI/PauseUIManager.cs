@@ -22,6 +22,30 @@ namespace IForgor.UI
 
 		private bool _groupANullified = true;
 		private bool _groupBNullified = true;
+		private bool _uiCreated;
+		private bool _disposed;
+		private PauseSnapshot _pendingPause;
+
+		private sealed class PauseSnapshot
+		{
+			internal readonly NoteData NoteA;
+			internal readonly NoteData NoteB;
+			internal readonly NoteCutInfo? CutA;
+			internal readonly NoteCutInfo? CutB;
+			internal readonly float SaberA;
+			internal readonly float SaberB;
+
+			internal PauseSnapshot(NoteData noteA, NoteData noteB, NoteCutInfo? cutA,
+				NoteCutInfo? cutB, float saberA, float saberB)
+			{
+				NoteA = noteA;
+				NoteB = noteB;
+				CutA = cutA;
+				CutB = cutB;
+				SaberA = saberA;
+				SaberB = saberB;
+			}
+		}
 
 		public UIGroup groupA;
 		public UIGroup groupB;
@@ -38,12 +62,41 @@ namespace IForgor.UI
 		}
 		
 		public void Initialize() {
-			CreateUIElements();
 			_pauseController.didPauseEvent += OnPause;
+			if (_assetLoader.IsComplete) OnAssetsCompleted();
+			else _assetLoader.Completed += OnAssetsCompleted;
 		}
 
 		public void Dispose() {
+			_disposed = true;
 			_pauseController.didPauseEvent -= OnPause;
+			_assetLoader.Completed -= OnAssetsCompleted;
+			_pendingPause = null;
+		}
+
+		private void OnAssetsCompleted()
+		{
+			_assetLoader.Completed -= OnAssetsCompleted;
+			if (_disposed || !_pauseController) return;
+			if (_assetLoader.LoadError != null)
+			{
+				_pauseController.didPauseEvent -= OnPause;
+				_pendingPause = null;
+				return;
+			}
+			try
+			{
+				CreateUIElements();
+				_uiCreated = true;
+				if (_pendingPause != null) ApplyPauseSnapshot(_pendingPause);
+				_pendingPause = null;
+			}
+			catch
+			{
+				_pauseController.didPauseEvent -= OnPause;
+				_pendingPause = null;
+				throw;
+			}
 		}
 
 		private void CreateUIElements() {
@@ -93,24 +146,42 @@ namespace IForgor.UI
 		}
 
 		private void OnPause() {
-			if (_noteRecorder.noteAData != null) {
+			if (_disposed) return;
+			if (!_uiCreated)
+			{
+				if (_assetLoader.LoadError != null) return;
+				_saberRecorder.RecordSaberAngles();
+				_pendingPause = new PauseSnapshot(_noteRecorder.noteAData, _noteRecorder.noteBData,
+					_noteRecorder.noteACutInfo, _noteRecorder.noteBCutInfo,
+					_saberRecorder.saberAAngle, _saberRecorder.saberBAngle);
+				return;
+			}
+			ApplyPauseSnapshot(null);
+		}
+
+		private void ApplyPauseSnapshot(PauseSnapshot snapshot)
+		{
+			if (_disposed || !groupA || !groupB) return;
+			NoteData noteA = snapshot == null ? _noteRecorder.noteAData : snapshot.NoteA;
+			NoteData noteB = snapshot == null ? _noteRecorder.noteBData : snapshot.NoteB;
+			if (noteA != null) {
 				if (_groupANullified && _colorManager != null) {
 					groupA.SetNoteColor(_colorManager.ColorForType(ColorType.ColorA));
 				}
 				_groupANullified = false;
-				groupA.SetNoteData(_noteRecorder.noteAData);
+				groupA.SetNoteData(noteA);
 			} else {
 				if (_colorManager != null) {
 					groupA.SetNoteColor(Color.gray);
 				}
 				_groupANullified = true;
 			}
-			if (_noteRecorder.noteBData != null) {
+			if (noteB != null) {
 				if (_groupBNullified && _colorManager != null) {
 					groupB.SetNoteColor(_colorManager.ColorForType(ColorType.ColorB));
 				}
 				_groupBNullified = false;
-				groupB.SetNoteData(_noteRecorder.noteBData);
+				groupB.SetNoteData(noteB);
 			} else {
 				if (_colorManager != null) {
 					groupB.SetNoteColor(Color.gray);
@@ -118,12 +189,12 @@ namespace IForgor.UI
 				_groupBNullified = true;
 			}
 
-			groupA.SetNoteCutInfo(_noteRecorder.noteACutInfo);
-			groupB.SetNoteCutInfo(_noteRecorder.noteBCutInfo);
+			groupA.SetNoteCutInfo(snapshot == null ? _noteRecorder.noteACutInfo : snapshot.CutA);
+			groupB.SetNoteCutInfo(snapshot == null ? _noteRecorder.noteBCutInfo : snapshot.CutB);
 
-			_saberRecorder.RecordSaberAngles();
-			groupA.SetSaberAngle(_saberRecorder.saberAAngle);
-			groupB.SetSaberAngle(_saberRecorder.saberBAngle);
+			if (snapshot == null) _saberRecorder.RecordSaberAngles();
+			groupA.SetSaberAngle(snapshot == null ? _saberRecorder.saberAAngle : snapshot.SaberA);
+			groupB.SetSaberAngle(snapshot == null ? _saberRecorder.saberBAngle : snapshot.SaberB);
 		}
 	}
 }

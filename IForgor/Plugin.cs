@@ -3,6 +3,7 @@ using IPA;
 using IPA.Logging;
 using ModestTree;
 using SiraUtil.Zenject;
+using IForgor.UI;
 
 namespace IForgor
 {
@@ -20,6 +21,7 @@ namespace IForgor
 		public void Init(Logger logger, Zenjector zenject)
 		{
 			Log = logger;
+			AssetLoader.PrepareResources();
 
 			zenject.Install<IFAppInstaller>(Location.App);
 			zenject.Install<IFGameInstaller>(Location.StandardPlayer);
